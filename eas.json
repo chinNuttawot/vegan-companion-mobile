@@ -5,27 +5,18 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      },
-      "env": {
-        "EXPO_USE_DEV_CLIENT": "true"
       }
     },
     "preview-apk": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      },
-      "env": {
-        "EXPO_USE_DEV_CLIENT": "true"
       }
     },
     "production": {
       "distribution": "store",
       "android": {
         "buildType": "app-bundle"
-      },
-      "env": {
-        "EXPO_USE_DEV_CLIENT": "true"
       }
     }
   }

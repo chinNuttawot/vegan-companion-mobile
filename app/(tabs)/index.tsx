@@ -50,6 +50,17 @@ export default function HomeScreen() {
     return true;
   }, []);
 
+  const onCreateWindow = useCallback((event: any) => {
+    const url = event?.nativeEvent?.url;
+    if (url) Linking.openURL(url).catch(() => {});
+    return false; // ไม่สร้าง webview ใหม่
+  }, []);
+
+  const onRenderGone = useCallback(() => {
+    // กันเคส render process ตาย
+    reload();
+  }, [reload]);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
@@ -59,7 +70,8 @@ export default function HomeScreen() {
         ref={webRef}
         source={{ uri: TARGET_URL }}
         originWhitelist={["*"]}
-        setSupportMultipleWindows={false}
+        setSupportMultipleWindows
+        onCreateWindow={onCreateWindow}
         onShouldStartLoadWithRequest={onShouldStart}
         onLoadStart={() => {
           setLoading(true);
@@ -82,6 +94,7 @@ export default function HomeScreen() {
             }`
           );
         }}
+        onRenderProcessGone={onRenderGone}
         startInLoadingState
         renderLoading={() => (
           <View style={styles.loadingBox}>
@@ -102,6 +115,7 @@ export default function HomeScreen() {
         domStorageEnabled
         cacheEnabled
         incognito={false}
+        androidHardwareAccelerationDisabled={false}
       />
 
       {(loading || errorInfo) && (
