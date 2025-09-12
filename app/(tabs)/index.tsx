@@ -1,98 +1,148 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+// app/(tabs)/index.tsx
+import React, { useCallback, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Linking,
+  Platform,
+  RefreshControl,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { WebView } from "react-native-webview";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+const TARGET_URL = "https://vegancompanion.passio.eco/";
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const webRef = useRef<WebView>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [errorInfo, setErrorInfo] = useState<string | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const reload = useCallback(() => {
+    setErrorInfo(null);
+    setLoading(true);
+    setRetryTick((n) => n + 1);
+    setTimeout(() => webRef.current?.reload(), 100);
+  }, []);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    reload();
+    setTimeout(() => setRefreshing(false), 700);
+  }, [reload]);
+
+  const onShouldStart = useCallback((event: any) => {
+    const url: string = event.url || "";
+    if (
+      url.startsWith("tel:") ||
+      url.startsWith("mailto:") ||
+      url.startsWith("sms:") ||
+      url.startsWith("intent:")
+    ) {
+      Linking.openURL(url).catch(() => {});
+      return false;
+    }
+    return true;
+  }, []);
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+
+      <WebView
+        key={retryTick}
+        ref={webRef}
+        source={{ uri: TARGET_URL }}
+        originWhitelist={["*"]}
+        setSupportMultipleWindows={false}
+        onShouldStartLoadWithRequest={onShouldStart}
+        onLoadStart={() => {
+          setLoading(true);
+          setErrorInfo(null);
+        }}
+        onLoadEnd={() => setLoading(false)}
+        onError={(e) => {
+          const { code, description, url } = e.nativeEvent || {};
+          setErrorInfo(
+            `Load error: ${description ?? "unknown"} (code ${code})\nURL: ${
+              url ?? TARGET_URL
+            }`
+          );
+        }}
+        onHttpError={(e) => {
+          const { statusCode, description, url } = e.nativeEvent || {};
+          setErrorInfo(
+            `HTTP error: ${statusCode} ${description ?? ""}\nURL: ${
+              url ?? TARGET_URL
+            }`
+          );
+        }}
+        startInLoadingState
+        renderLoading={() => (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" />
+          </View>
+        )}
+        pullToRefreshEnabled={Platform.OS === "android"}
+        {...(Platform.OS === "ios"
+          ? {
+              refreshControl: (
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              ),
+            }
+          : {})}
+        allowsBackForwardNavigationGestures={false}
+        showsVerticalScrollIndicator={false}
+        javaScriptEnabled
+        domStorageEnabled
+        cacheEnabled
+        incognito={false}
+      />
+
+      {(loading || errorInfo) && (
+        <View style={styles.overlay}>
+          {loading ? (
+            <ActivityIndicator size="large" />
+          ) : (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorTitle}>โหลดหน้าไม่สำเร็จ</Text>
+              <Text style={styles.errorMsg}>{errorInfo}</Text>
+              <TouchableOpacity onPress={reload} style={styles.retryBtn}>
+                <Text style={styles.retryText}>ลองใหม่</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: { height: "100%", backgroundColor: "#fff" },
+  webContainer: { flex: 1 },
+  loadingBox: { flex: 1, alignItems: "center", justifyContent: "center" },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    backgroundColor: "rgba(255,255,255,0.92)",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  errorBox: { maxWidth: 520, gap: 10, alignItems: "center" },
+  errorTitle: { fontSize: 16, fontWeight: "600" },
+  errorMsg: { fontSize: 12, textAlign: "center", opacity: 0.9 },
+  retryBtn: {
+    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
+  retryText: { fontSize: 14, fontWeight: "600" },
 });
